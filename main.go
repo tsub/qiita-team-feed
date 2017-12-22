@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/tools/blog/atom" 
 )
 
 type Item struct {
@@ -70,7 +73,41 @@ func main() {
 		return
 	}
 
-	for _, item := range *items {
-		fmt.Println(item.Title)
+	links := []atom.Link{
+		atom.Link{ Href: "https://" + team + ".qiita.com" },
 	}
+	person := &atom.Person{
+		Name: team,
+	}
+	entries := []*atom.Entry{}
+	for _, item := range *items {
+		itemLinks := []atom.Link{
+			atom.Link{ Href: item.URL },
+		}
+		itemPerson := &atom.Person{
+			Name: item.User.Name,
+		}
+		entries = append(entries, &atom.Entry{
+			Title: item.Title,
+			ID:    item.ID,
+			Link:  itemLinks,
+			Updated: atom.TimeStr(item.UpdatedAt.String()),
+			Author: itemPerson,
+		})
+	}
+	feed := atom.Feed{
+		Title: team + " Qiita:Team",
+		Link: links,
+		Updated: atom.TimeStr(time.Now().String()),
+		Author: person,
+		Entry: entries,
+	}
+
+	atomFeed, err := xml.Marshal(feed)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("%s", atomFeed)
 }
