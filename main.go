@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -50,7 +51,7 @@ type User struct {
 	WebsiteURL        string `json:"website_url"`
 }
 
-func main() {
+func generateAtom() (string, error) {
 	token := os.Getenv("QIITA_ACCESS_TOKEN")
 	team := os.Getenv("QIITA_TEAM_NAME")
 
@@ -61,16 +62,14 @@ func main() {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", err
 	}
 
 	defer resp.Body.Close()
 	items := new([]Item)
 	err = json.NewDecoder(resp.Body).Decode(items)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", err
 	}
 
 	links := []atom.Link{
@@ -105,9 +104,22 @@ func main() {
 
 	atomFeed, err := xml.Marshal(feed)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", err
 	}
 
-	fmt.Printf("%s", atomFeed)
+	return string(atomFeed[:]), nil
+}
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		atom, err := generateAtom()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Fatal(err)
+			fmt.Fprintf(w, err.Error())
+		} else {
+			fmt.Fprintf(w, atom)
+		}
+	})
+	log.Fatal(http.ListenAndServe(":8000", nil))
 }
